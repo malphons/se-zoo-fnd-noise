@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E01: Noisy Sensors — SE Zoo</title>
+    <meta name="description" content="Interactive exploration of measurement noise, signal-to-noise ratio, and Gaussian noise properties for robot state estimation.">
+
+    
+    <style>
+        :root {
+            --bg-primary:#0d1117;--bg-secondary:#161b22;--bg-card:#1c2128;
+            --bg-card-hover:#272d36;--bg-input:#21262d;
+            --text-primary:#e6edf3;--text-secondary:#8b949e;--text-muted:#6e7681;
+            --text-link:#58a6ff;--border-default:#30363d;--border-muted:#21262d;
+            --radius-sm:6px;--radius-md:10px;--transition:.2s ease;
+            --accent:#3fb950;
+        }
+        :root[data-theme="light"] {
+            --bg-primary:#ffffff;--bg-secondary:#f6f8fa;--bg-card:#ffffff;
+            --bg-card-hover:#f3f4f6;--bg-input:#f6f8fa;
+            --text-primary:#1f2328;--text-secondary:#656d76;--text-muted:#8b949e;
+            --text-link:#0969da;--border-default:#d0d7de;--border-muted:#d8dee4;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+             color:var(--text-primary);background:var(--bg-primary);-webkit-font-smoothing:antialiased;
+             line-height:1.6}
+    </style>
+    <link rel="stylesheet" href="../../css/item.css">
+    <link rel="stylesheet" href="../../css/animation.css">
+
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="item-page">
+
+        
+        <nav class="item-nav">
+            <a href="https://malphons.github.io/app_se_zoo/" class="item-nav__back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                Back to SE Zoo
+            </a>
+            <button class="item-nav__theme-toggle" aria-label="Toggle theme">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            </button>
+        </nav>
+
+        
+        <section class="item-hero">
+            <h1 class="item-hero__title">Noisy Sensors</h1>
+            <div class="item-hero__meta">
+                <span class="item-hero__module-id">E01</span>
+                <span class="item-hero__badge" style="background:#3fb950;color:#fff">Foundations</span>
+                <span class="item-hero__badge" style="background:rgba(63,185,80,.15);color:#3fb950">Sensor Noise</span>
+                <span class="item-hero__badge" style="background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border-default)">Pendulum</span>
+                <span class="item-hero__year">Est. 1960</span>
+            </div>
+            <p class="item-hero__desc">
+                Every sensor lies. Develop visceral intuition for how noise corrupts measurements
+                and what signal-to-noise ratio really means for state estimation.
+            </p>
+        </section>
+
+        
+        <div class="item-viz">
+            <div class="item-viz__split">
+                <div class="item-robot" id="robot-container">
+                    <span class="item-robot__label">Robot View</span>
+                </div>
+                <div class="item-diagram">
+                    <div class="item-diagram__controls">
+                        <button class="item-diagram__btn" id="btn-toggle-residuals">Show Residuals</button>
+                        <button class="item-diagram__btn" id="btn-regenerate">Regenerate</button>
+                        <button class="item-diagram__btn" onclick="SEZoo.diagram.resetZoom()">Reset View</button>
+                    </div>
+                    <div id="diagram-container"></div>
+                </div>
+            </div>
+            <div class="item-transport">
+                <button class="item-transport__btn" id="btn-step-back" aria-label="Step back">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="3" height="16"/><polygon points="20,4 8,12 20,20"/></svg>
+                </button>
+                <button class="item-transport__btn item-transport__btn--play" id="btn-play" aria-label="Play">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+                </button>
+                <button class="item-transport__btn" id="btn-step-fwd" aria-label="Step forward">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="4,4 16,12 4,20"/><rect x="17" y="4" width="3" height="16"/></svg>
+                </button>
+                <input type="range" class="item-transport__scrubber" id="scrubber" min="0" max="300" value="0">
+                <span class="item-transport__frame" id="frame-display">0 / 300</span>
+                <select class="item-transport__speed" id="speed-select">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="2">2x</option>
+                </select>
+            </div>
+        </div>
+
+        
+        <div class="item-sliders">
+            <div class="item-slider" id="slider-sigma">
+                <span class="item-slider__label">Noise \(\sigma\):</span>
+                <input type="range" class="item-slider__input" min="0" max="1.0" step="0.01" value="0.15">
+                <span class="item-slider__value">0.15</span>
+            </div>
+            <div class="item-slider" id="slider-frequency">
+                <span class="item-slider__label">Frequency (Hz):</span>
+                <input type="range" class="item-slider__input" min="0.1" max="2.0" step="0.1" value="0.5">
+                <span class="item-slider__value">0.5</span>
+            </div>
+        </div>
+
+        
+        <div class="item-stats" id="diagram-stats"></div>
+
+        
+        <div class="item-tabs">
+            <button class="item-tab-btn item-tab-btn--active" data-tab="overview">Overview</button>
+            <button class="item-tab-btn" data-tab="howto">How It Works</button>
+            <button class="item-tab-btn" data-tab="math">Math</button>
+            <button class="item-tab-btn" data-tab="code">Code</button>
+            <button class="item-tab-btn" data-tab="references">References</button>
+        </div>
+
+        
+        <div class="item-tab-content item-tab-content--active" id="tab-overview">
+            <div class="item-section">
+                <h2>Overview</h2>
+                <p>
+                    Every physical sensor &mdash; encoder, IMU, force/torque sensor, camera &mdash; introduces
+                    error into its readings. This error is called <strong>measurement noise</strong>, and
+                    understanding its properties is the foundation of all state estimation.
+                </p>
+                <p>
+                    In this module, a simple pendulum swings back and forth. The "encoder" attached to its
+                    pivot measures the angle $q(t)$, but every reading $y(t)$ is corrupted by additive
+                    Gaussian noise $v(t)$. Use the sliders above to see how noise magnitude ($\sigma$)
+                    affects the quality of measurements.
+                </p>
+
+                <div class="item-insight">
+                    <div class="item-insight__label">Key Insight</div>
+                    <p style="color:var(--text-secondary);margin:0">
+                        The signal-to-noise ratio (SNR) determines how much useful information each
+                        measurement contains. When SNR drops below ~10 dB, raw measurements become
+                        unreliable and filtering becomes essential.
+                    </p>
+                </div>
+
+                <h3>When to Use</h3>
+                <ul>
+                    <li>Characterizing a new sensor's noise properties</li>
+                    <li>Deciding whether raw sensor data is "good enough" or needs filtering</li>
+                    <li>Setting the measurement noise covariance $R$ in a Kalman filter</li>
+                    <li>Comparing sensor quality across different hardware</li>
+                </ul>
+
+                <h3>Key Properties</h3>
+                <ul>
+                    <li><strong>Additive</strong> &mdash; noise adds to the true signal: $y = q + v$</li>
+                    <li><strong>Zero-mean</strong> &mdash; on average, noise doesn't bias the measurement: $\mathbb{E}[v] = 0$</li>
+                    <li><strong>Gaussian</strong> &mdash; noise follows a normal distribution: $v \sim \mathcal{N}(0, \sigma^2)$</li>
+                    <li><strong>White</strong> &mdash; noise at different times is uncorrelated: $\mathbb{E}[v(t_1)v(t_2)] = 0$ for $t_1 \neq t_2$</li>
+                </ul>
+
+                <div class="item-proscons">
+                    <div class="item-pros">
+                        <h4>Advantages of This Model</h4>
+                        <ul>
+                            <li>Mathematically tractable</li>
+                            <li>Good first-order approximation for many sensors</li>
+                            <li>Central Limit Theorem justifies Gaussian assumption</li>
+                            <li>Single parameter ($\sigma$) fully characterizes noise</li>
+                        </ul>
+                    </div>
+                    <div class="item-cons">
+                        <h4>Limitations</h4>
+                        <ul>
+                            <li>Real noise may be non-Gaussian (outliers, bias drift)</li>
+                            <li>Doesn't capture colored (correlated) noise</li>
+                            <li>Ignores quantization effects</li>
+                            <li>May underestimate tail events</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="item-tab-content" id="tab-howto">
+            <div class="item-section">
+                <h2>How It Works</h2>
+                <p>
+                    The interactive diagram above simulates a pendulum with a noisy encoder. Here's what's happening:
+                </p>
+                <ol style="color:var(--text-secondary);padding-left:20px;margin-bottom:16px">
+                    <li style="margin-bottom:8px">
+                        <strong>True Signal:</strong> The pendulum angle follows $q(t) = A\sin(2\pi f t)$,
+                        shown as the smooth green curve. This is what we <em>want</em> to know.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Noise Generation:</strong> At each sample time $t_k$, an independent
+                        random value $v_k \sim \mathcal{N}(0, \sigma^2)$ is drawn using the
+                        Box-Muller transform.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Measurement:</strong> The sensor reports $y_k = q(t_k) + v_k$.
+                        These are the yellow dots scattered around the true curve.
+                    </li>
+                    <li style="margin-bottom:8px">
+                        <strong>Residuals:</strong> The difference $r_k = y_k - q(t_k) = v_k$ should form
+                        a Gaussian distribution (toggle "Show Residuals" to verify).
+                    </li>
+                </ol>
+                <p>
+                    Try increasing $\sigma$ and watch the SNR drop. Notice how the measurements
+                    become less and less useful as noise overwhelms the signal.
+                </p>
+            </div>
+        </div>
+
+        
+        <div class="item-tab-content" id="tab-math">
+            <div class="item-section">
+                <h2>Key Equations</h2>
+
+                <div class="item-math">
+                    <div class="item-math__label">Measurement Model</div>
+                    <p>$$y_k = q(t_k) + v_k, \quad v_k \sim \mathcal{N}(0, \sigma^2)$$</p>
+                </div>
+
+                <div class="item-math">
+                    <div class="item-math__label">Gaussian Probability Density</div>
+                    <p>$$p(v) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\!\left(-\frac{v^2}{2\sigma^2}\right)$$</p>
+                </div>
+
+                <div class="item-math">
+                    <div class="item-math__label">Signal-to-Noise Ratio (dB)</div>
+                    <p>$$\text{SNR}_{\text{dB}} = 10 \log_{10}\!\left(\frac{P_{\text{signal}}}{P_{\text{noise}}}\right) = 10 \log_{10}\!\left(\frac{A^2/2}{\sigma^2}\right)$$</p>
+                </div>
+
+                <div class="item-math">
+                    <div class="item-math__label">Measurement Covariance (Scalar)</div>
+                    <p>$$R = \mathbb{E}[v_k^2] = \sigma^2$$</p>
+                </div>
+
+                <div class="item-math">
+                    <div class="item-math__label">Sample Variance Estimator</div>
+                    <p>$$\hat{\sigma}^2 = \frac{1}{N-1}\sum_{k=1}^{N}(y_k - \bar{y})^2$$</p>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="item-tab-content" id="tab-code">
+            <div class="item-section">
+                <h2>MATLAB Implementation</h2>
+                <div class="item-code">
+                    <div class="item-code__label">MATLAB</div>
+                    <pre><code>%% E01: Noisy Sensors — Pendulum Measurement Simulation
+% Simulate a pendulum with additive Gaussian sensor noise
+
+% Parameters
+A     = 1.0;        % amplitude (rad)
+f     = 0.5;        % frequency (Hz)
+sigma = 0.15;       % noise std dev (rad)
+dt    = 0.02;       % sample period (s)
+T     = 6.0;        % duration (s)
+
+% Time vector
+t = 0:dt:T;
+N = length(t);
+
+% True signal
+q_true = A * sin(2*pi*f*t);
+
+% Noisy measurements
+v = sigma * randn(1, N);    % Gaussian noise
+y = q_true + v;             % measurement = truth + noise
+
+% Compute SNR
+P_signal = mean(q_true.^2);
+P_noise  = mean(v.^2);
+SNR_dB   = 10*log10(P_signal / P_noise);
+
+fprintf('SNR = %.1f dB\n', SNR_dB);
+fprintf('Empirical sigma = %.4f (true = %.4f)\n', std(v), sigma);
+
+% Plot
+figure;
+subplot(2,1,1);
+plot(t, q_true, 'g-', 'LineWidth', 2); hold on;
+plot(t, y, 'y.', 'MarkerSize', 4);
+legend('True q(t)', 'Measurements y_k');
+xlabel('Time (s)'); ylabel('Angle (rad)');
+title(sprintf('Noisy Pendulum (SNR = %.1f dB)', SNR_dB));
+
+subplot(2,1,2);
+histogram(v, 30, 'Normalization', 'pdf');
+hold on;
+vv = linspace(-3*sigma, 3*sigma, 100);
+plot(vv, normpdf(vv, 0, sigma), 'r-', 'LineWidth', 2);
+xlabel('Residual (rad)'); ylabel('PDF');
+title('Noise Distribution');</code></pre>
+                </div>
+
+                <h2>Python Implementation</h2>
+                <div class="item-code">
+                    <div class="item-code__label">Python (NumPy)</div>
+                    <pre><code>import numpy as np
+import matplotlib.pyplot as plt
+
+# Parameters
+A, f, sigma = 1.0, 0.5, 0.15
+dt, T = 0.02, 6.0
+t = np.arange(0, T + dt, dt)
+
+# True signal & noisy measurements
+q_true = A * np.sin(2 * np.pi * f * t)
+v = sigma * np.random.randn(len(t))
+y = q_true + v
+
+# SNR
+snr_db = 10 * np.log10(np.mean(q_true**2) / np.mean(v**2))
+print(f"SNR = {snr_db:.1f} dB")
+
+# Plot
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+ax1.plot(t, q_true, 'g-', lw=2, label='True q(t)')
+ax1.scatter(t, y, c='gold', s=4, alpha=0.5, label='Measurements')
+ax1.legend(); ax1.set_xlabel('Time (s)'); ax1.set_ylabel('Angle (rad)')
+ax2.hist(v, bins=30, density=True, alpha=0.7, color='gold')
+ax2.set_xlabel('Residual'); ax2.set_ylabel('PDF')
+plt.tight_layout(); plt.show()</code></pre>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="item-tab-content" id="tab-references">
+            <div class="item-section">
+                <h2>Key References</h2>
+                <ul>
+                    <li>Wiener, N. (1949). <em>Extrapolation, Interpolation, and Smoothing of Stationary Time Series</em>. MIT Press.</li>
+                    <li>Papoulis, A., & Pillai, S.U. (2002). <em>Probability, Random Variables, and Stochastic Processes</em>, 4th Ed. McGraw-Hill.</li>
+                    <li>Simon, D. (2006). <em>Optimal State Estimation</em>, Ch. 1-2. Wiley.</li>
+                    <li>Bar-Shalom, Y., Li, X.R., & Kirubarajan, T. (2001). <em>Estimation with Applications to Tracking and Navigation</em>, Ch. 1. Wiley.</li>
+                </ul>
+
+                <h3>Related Modules</h3>
+                <div class="item-related">
+                    <a href="https://malphons.github.io/se-zoo-fnd-differentiation/items/velocity-from-pos/" class="item-related__link">E02: Velocity from Position &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    
+    <script src="js/data.js"></script>
+    <script src="../../js/shared-diagram.js"></script>
+    <script src="../../js/shared-animation.js"></script>
+    <script src="../../js/shared-tabs.js"></script>
+
+    <script>
+    (function () {
+        'use strict';
+
+        var data = SEZoo.itemData;
+        var showResiduals = false;
+        var sim, anim;
+
+        /* Initialize tabs & theme */
+        SEZoo.tabs.init({ themeKey: 'sezoo_theme' });
+
+        /* Initialize chart */
+        SEZoo.diagram.init('#diagram-container', {
+            width: 800,
+            height: 380,
+            xDomain: [0, data.params.duration],
+            yDomain: [-1.8, 1.8],
+            xLabel: 'Time (s)',
+            yLabel: 'Angle (rad)'
+        });
+
+        /* Initialize robot SVG */
+        var robot = SEZoo.anim.createRobotSvg('#robot-container', {
+            viewBox: '-150 -30 300 280'
+        });
+
+        /* ---------- Chart rendering ---------- */
+
+        function renderChart() {
+            SEZoo.diagram.clear();
+
+            /* True signal (green) */
+            SEZoo.diagram.drawTimeSeries(sim.trueData, {
+                color: '#3fb950', width: 2.5, opacity: 0.9,
+                className: 'se-true-signal'
+            });
+
+            if (showResiduals) {
+                SEZoo.diagram.drawTimeSeries(sim.residuals, {
+                    color: '#f85149', width: 1, opacity: 0.5,
+                    className: 'se-residuals', animate: false
+                });
+                SEZoo.diagram.drawHistogram(sim.residuals, {
+                    color: '#f85149', opacity: 0.35, className: 'se-hist'
+                });
+            } else {
+                SEZoo.diagram.drawScatterPoints(sim.noisyData, {
+                    color: '#f0c808', radius: 2.5, opacity: 0.45,
+                    className: 'se-measurements', delayPerPoint: 2
+                });
+            }
+
+            /* +/- sigma band */
+            var upper = sim.trueData.map(function (d) { return { t: d.t, v: d.v + data.params.sigma }; });
+            var lower = sim.trueData.map(function (d) { return { t: d.t, v: d.v - data.params.sigma }; });
+            SEZoo.diagram.drawBand(upper, lower, {
+                color: '#3fb950', opacity: 0.08, className: 'se-sigma-band'
+            });
+
+            /* Stats */
+            var statsEl = document.getElementById('diagram-stats');
+            if (statsEl) {
+                statsEl.textContent =
+                    'SNR: ' + sim.stats.snrDb.toFixed(1) + ' dB  |  ' +
+                    '\u03C3 (set): ' + data.params.sigma.toFixed(3) +
+                    '  \u03C3 (empirical): ' + sim.stats.empiricalStd.toFixed(3) + '  |  ' +
+                    'N: ' + sim.stats.nSamples + ' samples';
+            }
+        }
+
+        /* ---------- Robot frame rendering ---------- */
+
+        function renderRobotFrame(frame) {
+            if (!sim || !robot) return;
+            var trueAngle = sim.trueData[frame].v;
+            var noisyAngle = sim.noisyData[frame].v;
+            var t = sim.trueData[frame].t;
+
+            /* Draw pendulum at true angle */
+            var bob = SEZoo.anim.drawPendulum(robot.g, trueAngle, 140, {
+                color: SEZoo.anim.SE_COLORS.true_state
+            });
+
+            /* Draw noise overlay — yellow dot at measured position + error line */
+            SEZoo.anim.drawNoiseScatter(robot.g, bob.bx, bob.by, noisyAngle, 140);
+
+            /* Angle label */
+            SEZoo.anim.drawAngleLabel(robot.g, 0, 0, trueAngle, {
+                color: SEZoo.anim.SE_COLORS.true_state, radius: 35
+            });
+
+            /* Time cursor on chart */
+            var scales = SEZoo.diagram.getScales();
+            var dims = SEZoo.diagram.getDims();
+            var margin = SEZoo.diagram.getMargin();
+            SEZoo.anim.drawTimeCursor(SEZoo.diagram.getSvg(), scales.x, t, dims.height, margin);
+        }
+
+        /* ---------- Initialize ---------- */
+
+        function regenerate() {
+            sim = data.generate();
+            renderChart();
+            if (anim) {
+                anim.reset(sim.trueData.length);
+            }
+        }
+
+        sim = data.generate();
+        renderChart();
+
+        anim = new SEZoo.anim.AnimController({
+            totalFrames: sim.trueData.length,
+            fps: 30,
+            playBtn:     document.getElementById('btn-play'),
+            scrubber:    document.getElementById('scrubber'),
+            frameDisplay: document.getElementById('frame-display'),
+            speedSelect: document.getElementById('speed-select'),
+            stepBackBtn: document.getElementById('btn-step-back'),
+            stepFwdBtn:  document.getElementById('btn-step-fwd'),
+            onFrame: renderRobotFrame
+        });
+
+        /* ---------- Controls ---------- */
+
+        document.getElementById('btn-toggle-residuals').addEventListener('click', function () {
+            showResiduals = !showResiduals;
+            this.textContent = showResiduals ? 'Show Measurements' : 'Show Residuals';
+            this.classList.toggle('item-diagram__btn--active', showResiduals);
+            renderChart();
+        });
+
+        document.getElementById('btn-regenerate').addEventListener('click', function () {
+            regenerate();
+        });
+
+        /* Sigma slider */
+        var sigmaSlider = document.querySelector('#slider-sigma .item-slider__input');
+        var sigmaDisplay = document.querySelector('#slider-sigma .item-slider__value');
+        sigmaSlider.addEventListener('input', function () {
+            data.params.sigma = parseFloat(this.value);
+            sigmaDisplay.textContent = data.params.sigma.toFixed(2);
+            regenerate();
+        });
+
+        /* Frequency slider */
+        var freqSlider = document.querySelector('#slider-frequency .item-slider__input');
+        var freqDisplay = document.querySelector('#slider-frequency .item-slider__value');
+        freqSlider.addEventListener('input', function () {
+            data.params.frequency = parseFloat(this.value);
+            freqDisplay.textContent = data.params.frequency.toFixed(1);
+            regenerate();
+        });
+    })();
+    </script>
+</body>
+</html>

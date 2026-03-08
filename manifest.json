@@ -1,0 +1,27 @@
+{
+    "schema_version": "1.0",
+    "repo_id": "se-zoo-fnd-noise",
+    "group": "foundations",
+    "category": "noise",
+    "label": "Sensor Noise",
+    "color_accent": "#3fb950",
+    "items": [
+        {
+            "id": "noisy-sensors",
+            "module_id": "E01",
+            "name": "Noisy Sensors",
+            "short_description": "Every sensor lies. Develop visceral intuition for how noise corrupts measurements and what signal-to-noise ratio means for estimation.",
+            "group": "foundations",
+            "category": "noise",
+            "tags": ["noise", "SNR", "measurement", "gaussian", "encoder", "pendulum"],
+            "year_introduced": 1960,
+            "key_paper": "Wiener (1949)",
+            "complexity": "beginner",
+            "color_accent": "#3fb950",
+            "robot": "Pendulum",
+            "core_concept": "Measurement noise & SNR",
+            "use_cases": ["Sensor characterization", "Noise quantification", "Baseline estimation"],
+            "related_items": ["velocity-from-pos"]
+        }
+    ]
+}
